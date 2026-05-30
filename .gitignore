@@ -4,3 +4,6 @@ __pycache__/
 .ipynb_checkpoints/
 .DS_Store
 .python-version
+data/processed/
+CONTEXT.md
+main.py
