@@ -1,6 +1,6 @@
 # Preprocessing and Quality Assessment Report
 
-This report summarizes notebook sections `3. Text Preprocessing`, `3.4 Preprocessing Quality Assessment`, and `3.5 Corrected Preprocessing Benchmark` from `notebooks/workflow.ipynb`. The goal is to document how the current preprocessing pipeline behaves, measure whether it preserves useful sentiment signal, and identify which parts of the cleaner reduce predictive power.
+This report summarizes notebook sections `3. Text Preprocessing`, `3.4 Preprocessing Quality Assessment`, and `3.5 Preprocessing Combination Benchmark` from `notebooks/workflow.ipynb`. The goal is to document how the current preprocessing pipeline behaves, measure whether it preserves useful sentiment signal, and identify which preprocessing combination performs best.
 
 ## Preprocessing Setup
 
@@ -12,12 +12,11 @@ The preprocessing stage starts from the train, validation, and test text splits.
 | `wordnet` | Support lemmatization |
 | `omw-1.4` | Support WordNet metadata used by the lemmatizer |
 
-The notebook now works with two stopword configurations:
+The notebook uses one stopword configuration:
 
 | Stopword set | Description |
 | --- | --- |
-| `stop_words` | Original stopword set used by the first cleaned baseline |
-| `revised_stop_words` | Corrected stopword set that preserves selected sentiment-bearing terms |
+| `stop_words` | English stopwords plus a small set of URL/source artifacts |
 
 The shared custom stopwords are:
 
@@ -30,28 +29,19 @@ The shared custom stopwords are:
 | `u` | Fragment from `U.S.` token handling |
 | `s` | Fragment from `U.S.` token handling |
 
-The revised stopword configuration explicitly preserves:
-
-- negations: `no`, `nor`, `not`
-- market direction terms: `up`, `down`
-- high-value financial sentiment terms: `beats`, `misses`, `cuts`, `raised`, `gain`, `loss`
-
-This means the notebook has moved beyond the earlier recommendation to revise stopword handling: that correction is now implemented and benchmarked.
-
 ## Text Variants
 
-The notebook currently uses these text representations:
+The notebook first inspects these baseline text representations:
 
 | Variant | Description |
 | --- | --- |
 | `original` | Raw tweet text |
 | `raw_lower` | Raw text lowercased only |
 | `cleaned` | Original lowercased and cleaned text after regex filtering and stopword removal |
-| `cleaned_revised` | Corrected cleaned text using the revised stopword set |
 | `lemmatized` | Original cleaned text after lemmatization |
 | `stemmed` | Original cleaned text after stemming |
 
-The original `cleaned` representation remains useful as a historical baseline. The new `cleaned_revised` representation is the corrected cleaner introduced to preserve terms that were previously being removed.
+Section `3.5` then expands this into a full combination benchmark over regex cleaning, stopword removal, lemmatization, and stemming.
 
 ## Original 3.4 Findings
 
@@ -119,130 +109,62 @@ Many strongly concentrated terms are Neutral-specific, including `transcript`, `
 | `lemmatized` | 0.6509 | 0.7543 | 0.7784 |
 | `cleaned` | 0.6434 | 0.7498 | 0.7763 |
 
-The original conclusion still holds: `raw_lower` is stronger than the original `cleaned`, `lemmatized`, and `stemmed` variants. The original cleaning pipeline removes more predictive information than it adds.
+This diagnostic was limited to the original four variants. Section `3.5` broadens the comparison and changes the selected preprocessing choice.
 
-## Corrected Preprocessing Benchmark (`3.5`)
+## Preprocessing Combination Benchmark (`3.5`)
 
-Section `3.5` implements the corrected stopword logic and compares the new cleaner against `raw_lower` and the original cleaned baseline.
+Section `3.5` compares all meaningful combinations of the preprocessing strategies used in the notebook. Each row is evaluated with the same TF-IDF Logistic Regression diagnostic model.
 
-### Preserved-Term Audit
+The benchmark dimensions are:
 
-| Check | Tokens |
-| --- | --- |
-| `preserved_terms_still_in_stopwords` | `[]` |
-| `preserved_terms_available_for_model` | `beats`, `cuts`, `down`, `gain`, `loss`, `misses`, `no`, `nor`, `not`, `raised`, `up` |
+- `raw_lower`: original tweet text converted to lowercase
+- `regex_clean`: URL, mention, and repeated-whitespace removal
+- `stopwords`: removal using the original `stop_words` list
+- `lemmatized`: token lemmatization
+- `stemmed`: token stemming
 
-This confirms that the corrected cleaner no longer removes the specific sentiment-bearing terms identified in the earlier report.
+Lemmatization and stemming are treated as alternatives, not stacked transformations.
 
-### Step Inspection
-
-The notebook now shows a side-by-side dataframe with these stages:
-
-- `original`
-- `cleaned`
-- `raw_lower`
-- `raw_lower_regex_clean`
-- `cleaned_revised`
-- `revised_without_regex_clean`
-- `revised_without_stopword_removal`
-
-This makes the effect of each stage visible. For example, the tweet `Futures up https://...` becomes:
-
-- `cleaned`: `futures`
-- `cleaned_revised`: `futures up`
-
-That is the intended correction: the revised cleaner still removes the URL, but it now preserves the directional term `up`.
-
-### Revised Benchmark Results
+### Combination Results
 
 | Variant | Macro F1 | Weighted F1 | Accuracy |
 | --- | ---: | ---: | ---: |
-| `raw_lower` | 0.6833 | 0.7768 | 0.7968 |
-| `cleaned_revised` | 0.6558 | 0.7580 | 0.7826 |
-| `cleaned` | 0.6434 | 0.7498 | 0.7763 |
-
-Interpretation:
-
-- `cleaned_revised` improves over the original `cleaned` baseline by `+0.0123` macro F1
-- `cleaned_revised` still trails `raw_lower` by `-0.0275` macro F1
-- the stopword correction helps, but it does not fully recover the predictive power lost by cleaning
-
-The strongest variant in the corrected benchmark remains `raw_lower`.
-
-### Per-Class Results for the Stronger Raw-vs-Corrected Option
-
-Because `raw_lower` still wins the corrected benchmark, the notebook prints the detailed classification report for `raw_lower`:
-
-| Sentiment | Label | Precision | Recall | F1 | Support |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| Bearish | `0` | 0.8060 | 0.3750 | 0.5118 | 288 |
-| Bullish | `1` | 0.7797 | 0.5792 | 0.6647 | 385 |
-| Neutral | `2` | 0.7992 | 0.9628 | 0.8734 | 1236 |
-
-The class-level interpretation is unchanged: Neutral is easiest, Bearish recall is weakest, and macro F1 remains more informative than accuracy for model comparison.
-
-## Component Ablation
-
-The notebook now isolates the revised cleaner's components in two complementary ways.
-
-### Cumulative View
-
-This view asks: what happens as stages are added one by one?
-
-| Variant | Macro F1 | Weighted F1 | Accuracy |
-| --- | ---: | ---: | ---: |
-| `raw_lower` | 0.6833 | 0.7768 | 0.7968 |
+| `raw_lower_regex_clean_stemmed` | 0.7045 | 0.7895 | 0.8051 |
+| `raw_lower_stemmed` | 0.7019 | 0.7881 | 0.8041 |
+| `raw_lower_lemmatized` | 0.6888 | 0.7782 | 0.7962 |
+| `raw_lower_regex_clean_lemmatized` | 0.6865 | 0.7768 | 0.7952 |
 | `raw_lower_regex_clean` | 0.6850 | 0.7780 | 0.7978 |
-| `cleaned_revised` | 0.6558 | 0.7580 | 0.7826 |
+| `original` | 0.6833 | 0.7768 | 0.7968 |
+| `raw_lower` | 0.6833 | 0.7768 | 0.7968 |
+| `raw_lower_regex_clean_stopwords_stemmed` | 0.6721 | 0.7658 | 0.7852 |
+| `raw_lower_stopwords_stemmed` | 0.6717 | 0.7669 | 0.7868 |
+| `raw_lower_regex_clean_stopwords_lemmatized` | 0.6509 | 0.7543 | 0.7784 |
+| `raw_lower_stopwords_lemmatized` | 0.6473 | 0.7519 | 0.7763 |
+| `raw_lower_regex_clean_stopwords` | 0.6434 | 0.7498 | 0.7763 |
+| `raw_lower_stopwords` | 0.6394 | 0.7474 | 0.7748 |
 
 Interpretation:
 
-- adding regex cleaning slightly improves macro F1 by `+0.0017`
-- adding stopword removal after regex cleaning reduces macro F1 by `-0.0292`
-
-Regex cleaning appears neutral to slightly helpful. The large drop happens when stopword removal is applied.
-
-### Leave-One-Out View
-
-This view asks: if the full revised cleaner is used, what happens when one stage is removed?
-
-| Variant | Macro F1 | Weighted F1 | Accuracy |
-| --- | ---: | ---: | ---: |
-| `cleaned_revised` | 0.6558 | 0.7580 | 0.7826 |
-| `revised_without_regex_clean` | 0.6552 | 0.7576 | 0.7821 |
-| `revised_without_stopword_removal` | 0.6850 | 0.7780 | 0.7978 |
-
-Interpretation:
-
-- removing regex cleaning slightly hurts performance by `-0.0006`
-- removing stopword removal improves macro F1 by `+0.0292`
-
-This confirms the cumulative result: regex cleaning is not the problem, while stopword removal is the dominant source of performance loss in the revised cleaner.
-
-### Ablation Conclusion
-
-The notebook's summary cell reports:
-
-- largest cumulative drop: `add_stopword_removal`
-- largest leave-one-out improvement: `remove_stopword_removal`
-
-The practical conclusion is direct: stopword removal remains the main performance bottleneck, even after preserving the most obvious sentiment-bearing terms.
+- the strongest variant is `raw_lower_regex_clean_stemmed`
+- stemming improves over the lowercase-only baseline, especially when combined with regex cleaning
+- stopword removal hurts performance across the tested combinations
+- regex cleaning is mildly helpful, with the best score coming from regex cleaning plus stemming
 
 ## Conclusion
 
 The current notebook evidence supports three conclusions.
 
-1. `raw_lower` remains the strongest baseline for feature engineering.
-   It still has the best overall diagnostic performance, with macro F1 `0.6833`, weighted F1 `0.7768`, and accuracy `0.7968`.
+1. `raw_lower_regex_clean_stemmed` is the strongest preprocessing representation in the full diagnostic grid.
+   It reaches macro F1 `0.7045`, weighted F1 `0.7895`, and accuracy `0.8051`.
 
-2. `cleaned_revised` is meaningfully better than the original `cleaned` baseline.
-   Preserving negations and key financial direction terms improves macro F1 from `0.6434` to `0.6558`.
+2. Stemming is useful in this setup.
+   The two best variants both apply stemming, and both outperform the original lowercase-only baseline.
 
-3. The remaining weakness is mainly stopword removal, not regex cleaning.
-   The ablation results show that removing URLs and mentions is slightly helpful, while stopword removal is still responsible for the largest drop in predictive power.
+3. Stopword removal remains harmful.
+   The stopword-removal combinations sit below their comparable no-stopword alternatives, which suggests that short financial tweets depend on words that generic stopword lists remove.
 
 The best current recommendation is therefore:
 
-- use `raw_lower` as the primary baseline for downstream feature engineering
-- keep `cleaned_revised` as the better cleaned alternative for comparison experiments
-- avoid broader stopword removal unless it becomes more selective or is redesigned around domain-specific evidence
+- select `raw_lower_regex_clean_stemmed` as the best diagnostic preprocessing variant
+- keep `raw_lower` as a simple baseline for comparison
+- avoid stopword removal unless the stopword list is redesigned around domain-specific evidence

@@ -6,12 +6,12 @@ This report documents the completed results from section `4. Feature Engineering
 
 | Variant | Feature family | Text input | Implementation |
 | --- | --- | --- | --- |
-| `bow_count_raw_lower` | BoW | `raw_lower` | `CountVectorizer(min_df=2)` |
-| `tfidf_raw_lower` | TF-IDF | `raw_lower` | `TfidfVectorizer(min_df=2)` |
-| `word2vec_skipgram_mean_raw_lower` | Word2Vec | `raw_lower` | skip-gram Word2Vec with mean-pooled token vectors |
+| `bow_count_raw_lower_regex_clean_stemmed` | BoW | `raw_lower_regex_clean_stemmed` | `CountVectorizer(min_df=2)` |
+| `tfidf_raw_lower_regex_clean_stemmed` | TF-IDF | `raw_lower_regex_clean_stemmed` | `TfidfVectorizer(min_df=2)` |
+| `word2vec_skipgram_mean_raw_lower_regex_clean_stemmed` | Word2Vec | `raw_lower_regex_clean_stemmed` | skip-gram Word2Vec with mean-pooled token vectors |
 | `finbert_mean_pool_original` | Transformer Encoder | original raw text | `ProsusAI/finbert` last-hidden-state mean pooling |
 
-The preprocessing assessment still drives the text choice. Lowercase-only raw text remained the best classical baseline, so BoW, TF-IDF, and Word2Vec use `raw_lower`. FinBERT uses the original tweet text because the pretrained tokenizer expects the raw sequence format.
+The preprocessing combination benchmark selected `raw_lower_regex_clean_stemmed` as the strongest diagnostic preprocessing variant, so BoW, TF-IDF, and Word2Vec now use that text input. FinBERT uses the original tweet text because the pretrained tokenizer expects natural text rather than stemmed tokens.
 
 ## Implemented Representations
 
@@ -46,9 +46,9 @@ The notebook produced the following feature matrix shapes:
 
 | Variant | Train shape | Validation shape | Feature dimension |
 | --- | --- | --- | --- |
-| `bow_count_raw_lower` | `(7634, 6292)` | `(1909, 6292)` | `6292` |
-| `tfidf_raw_lower` | `(7634, 6292)` | `(1909, 6292)` | `6292` |
-| `word2vec_skipgram_mean_raw_lower` | `(7634, 100)` | `(1909, 100)` | `100` |
+| `bow_count_raw_lower_regex_clean_stemmed` | `(7634, 5482)` | `(1909, 5482)` | `5482` |
+| `tfidf_raw_lower_regex_clean_stemmed` | `(7634, 5482)` | `(1909, 5482)` | `5482` |
+| `word2vec_skipgram_mean_raw_lower_regex_clean_stemmed` | `(7634, 100)` | `(1909, 100)` | `100` |
 | `finbert_mean_pool_original` | `(7634, 768)` | `(1909, 768)` | `768` |
 
 The validation benchmark ranked the feature families as follows:
@@ -56,12 +56,12 @@ The validation benchmark ranked the feature families as follows:
 | Rank | Variant | Feature family | Macro F1 | Weighted F1 | Accuracy |
 | --- | --- | --- | --- | --- | --- |
 | 1 | `finbert_mean_pool_original` | Transformer Encoder | `0.7412` | `0.8063` | `0.8078` |
-| 2 | `bow_count_raw_lower` | BoW | `0.7076` | `0.7914` | `0.7999` |
-| 3 | `tfidf_raw_lower` | TF-IDF | `0.6833` | `0.7768` | `0.7968` |
-| 4 | `word2vec_skipgram_mean_raw_lower` | Word2Vec | `0.5970` | `0.7235` | `0.7470` |
+| 2 | `bow_count_raw_lower_regex_clean_stemmed` | BoW | `0.7243` | `0.7996` | `0.8051` |
+| 3 | `tfidf_raw_lower_regex_clean_stemmed` | TF-IDF | `0.7045` | `0.7895` | `0.8051` |
+| 4 | `word2vec_skipgram_mean_raw_lower_regex_clean_stemmed` | Word2Vec | `0.6088` | `0.7266` | `0.7465` |
 
 ## Conclusion
 
-The strongest representation from the completed run is `finbert_mean_pool_original`. It leads the comparison on all tracked metrics and improves the primary macro F1 score from the best sparse baseline (`bow_count_raw_lower`, `0.7076`) to `0.7412`.
+The strongest representation from the completed run is `finbert_mean_pool_original`. It leads the comparison on all tracked metrics and improves the primary macro F1 score from the best sparse baseline (`bow_count_raw_lower_regex_clean_stemmed`, `0.7243`) to `0.7412`.
 
-For the next modeling stage, `finbert_mean_pool_original` should be treated as the main feature candidate, while the other three variants remain documented comparison baselines.
+This result makes `finbert_mean_pool_original` the preferred input representation for the classification-model section, where it will be compared again alongside the BoW, TF-IDF, and Word2Vec representations.
