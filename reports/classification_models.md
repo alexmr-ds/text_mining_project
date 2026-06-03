@@ -16,7 +16,7 @@ Each classifier family also includes two variations where useful: default versus
 
 | Rank | Variant | Representation | Classifier family | Macro F1 | Weighted F1 | Accuracy |
 | ---: | --- | --- | --- | ---: | ---: | ---: |
-| 1 | `finbert_full_finetune` | `finbert_sequence` | Fine-tuned FinBERT | 0.8212 | 0.8653 | 0.8633 |
+| 1 | `finbert_full_finetune` | `finbert_sequence` | Fine-tuned FinBERT | 0.8277 | 0.8699 | 0.8685 |
 | 2 | `finbert_embedding_logreg_baseline` | `finbert_mean_pool_original` | FinBERT Embeddings + Logistic Regression | 0.7412 | 0.8063 | 0.8078 |
 | 3 | `tfidf_logreg_balanced` | `tfidf_raw_lower_regex_clean_stemmed` | Logistic Regression | 0.7409 | 0.8045 | 0.7994 |
 | 4 | `tfidf_linear_svm_balanced` | `tfidf_raw_lower_regex_clean_stemmed` | Linear SVM | 0.7339 | 0.8039 | 0.8030 |
@@ -33,6 +33,6 @@ Section 6 uses the stored classification reports to add the explicit precision, 
 
 ## Conclusion
 
-The best-performing model is `finbert_full_finetune`, with validation macro F1 `0.8212`. It is the preferred classification model because it improves clearly over both the best traditional sparse-text setup and the FinBERT embedding-extraction baseline.
+The best-performing model is `finbert_full_finetune`, with validation macro F1 `0.8277`. It is the preferred classification model because it improves clearly over both the best traditional sparse-text setup and the FinBERT embedding-extraction baseline.
 
 For a faster or more explainable fallback, `tfidf_logreg_balanced` is the strongest traditional ML option, reaching macro F1 `0.7409` while using the selected `raw_lower_regex_clean_stemmed` preprocessing pipeline.
