@@ -135,8 +135,13 @@ def train_transformer_classifier(
     learning_rate: float = 2e-5,
     freeze_encoder: bool = False,
     seed: int = 73,
+    save_path: str | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Fine-tune and evaluate a transformer sequence classifier."""
+    """Fine-tune and evaluate a transformer sequence classifier.
+
+    If *save_path* is provided the trained model and tokenizer are saved there
+    with ``save_pretrained`` so they can be reloaded later for inference.
+    """
     set_random_seed(seed)
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     model = AutoModelForSequenceClassification.from_pretrained(
@@ -178,6 +183,10 @@ def train_transformer_classifier(
             val_true.extend(labels)
             val_pred.extend(predictions)
 
+    if save_path is not None:
+        model.save_pretrained(save_path)
+        tokenizer.save_pretrained(save_path)
+
     row = {
         "variant": variant,
         "representation": "finbert_sequence",
@@ -186,3 +195,52 @@ def train_transformer_classifier(
     }
     report = classification_report(val_true, val_pred, output_dict=True, zero_division=0)
     return row, report
+
+
+def predict_transformer_classifier(
+    model_path: str,
+    texts: Iterable[str],
+    device: str,
+    max_length: int = 128,
+    batch_size: int = 16,
+) -> list[int]:
+    """Load a saved transformer classifier and predict labels for *texts*.
+
+    Parameters
+    ----------
+    model_path:
+        Directory previously written by ``save_pretrained`` (from
+        ``train_transformer_classifier`` with *save_path* set).
+    texts:
+        Raw input strings to classify.
+    device:
+        Torch device string, e.g. ``"cpu"``, ``"cuda"``, or ``"mps"``.
+    max_length:
+        Tokeniser truncation length — must match the value used during training.
+    batch_size:
+        Number of samples per inference batch.
+
+    Returns
+    -------
+    list[int]
+        Predicted integer class labels in the same order as *texts*.
+    """
+    tokenizer = AutoTokenizer.from_pretrained(model_path)
+    model = AutoModelForSequenceClassification.from_pretrained(model_path).to(device)
+    model.eval()
+
+    texts_list = [str(t) for t in texts]
+    # Dummy labels — not used during inference but required by the Dataset class.
+    dummy_labels = [0] * len(texts_list)
+    dataset = TextClassificationDataset(texts_list, dummy_labels, tokenizer, max_length)
+    loader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
+
+    predictions: list[int] = []
+    with torch.no_grad():
+        for batch in loader:
+            batch = {key: value.to(device) for key, value in batch.items()}
+            outputs = model(**batch)
+            preds = outputs.logits.argmax(dim=-1).cpu().numpy().tolist()
+            predictions.extend(preds)
+
+    return predictions
